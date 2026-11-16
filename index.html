@@ -58,7 +58,7 @@ button.lnk{border-radius:0;font-weight:400}
 .toolbar h2{margin:0;font-size:17px;letter-spacing:-.01em}
 .msg{padding:0 18px 12px;margin:0}
 .wrap{border:0;border-radius:0;border-top:1px solid var(--line)}
-table{min-width:1100px}th{background:var(--card);padding:11px 12px;border-bottom:1px solid var(--line)}th:hover{color:var(--text)}
+table{min-width:900px}th{background:var(--card);padding:11px 12px;border-bottom:1px solid var(--line)}th:hover{color:var(--text)}
 td{padding:13px 12px}tbody tr{transition:background .12s}tbody tr:hover td{background:var(--accent-soft)}tbody tr:last-child td{border-bottom:0}
 td:nth-child(2),th:nth-child(2){position:sticky;left:0;background:var(--card);z-index:1}th:nth-child(2){z-index:3}
 .av{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;margin-right:10px;vertical-align:middle;font-size:12px;font-weight:700;color:#fff;background:hsl(var(--h) 55% 46%)}
@@ -185,7 +185,7 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 </div></div>
 <script src="coins.js"></script>
 <script>
-var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["lo","5y low"],["ma30","MA 30"],["ma90","MA 90"],["ma120","MA 120"],["rsi","RSI"],["srsi","Stoch RSI"],["mfi","MFI"],["score","Price level"]];
+var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["fromHi","% from 5y high"],["lo","5y low"],["fromLo","% from 5y low"],["ma120","MA 120"],["score","Price level"]];
 var REFRESH_HOURS=2,KEY="cs_cache_v3";
 var lastT=null;
 var rows=[],sortKey="rank",sortDir=1,bull=null;
@@ -340,10 +340,15 @@ function updateTiles(){
   $("tUpdN").textContent=lastT?"Next refresh after "+hhmm(lastT+REFRESH_HOURS*3600000):"Loading…";
   pfSync();
 }
+function fp(v){
+  if(v==null||isNaN(v))return "–";
+  var a=Math.abs(v),t=a>=1000?a.toLocaleString(undefined,{maximumFractionDigits:0}):a.toFixed(1);
+  return (v>=0?"+":"−")+t+"%";
+}
 function f1(v){return v==null?"–":v.toFixed(1)}
 function render(){
   var f=$("filter").value;
-  rows.forEach(function(r){var l=level(r);r.lvl=l;r.score=l?l.s:0});
+  rows.forEach(function(r){var l=level(r);r.lvl=l;r.score=l?l.s:0;var ok=r.price>0&&r.hi>0&&r.lo>0;r.fromHi=ok?(r.price/r.hi-1)*100:null;r.fromLo=ok?(r.price/r.lo-1)*100:null});
   var list=rows.filter(function(r){
     if(f==="all")return true;
     var s=r.score;
@@ -363,9 +368,9 @@ function render(){
     else if(r.lvl){sg=r.lvl.n;cl=r.lvl.s>0?"buy":"sell"}
     else{sg="Normal";cl="none"}
     var full=r.state==="ok";
-    return "<tr><td>"+r.rank+"</td><td><span class='av' style='--h:"+hue(r.sym)+"'>"+esc(r.sym.charAt(0))+"</span>"+nameHtml(r)+"<a class='sym' href='"+cmcUrl(r.slug)+"' target='_blank' rel='noopener'>"+esc(r.sym)+"</a></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td>"+fmt(r.lo)+"</td>"+
-    ["ma30","ma90","ma120"].map(function(k){return "<td class='"+(r[k]==null?"":r.price>r[k]?"up":"dn")+"'>"+fmt(r[k])+"</td>"}).join("")+
-    "<td>"+(full?f1(r.rsi):"–")+"</td><td>"+(full?f1(r.srsi):"–")+"</td><td>"+(full?f1(r.mfi):"–")+"</td><td class='sig'><span class='pill "+cl+"'>"+sg+"</span></td></tr>";
+    return "<tr><td>"+r.rank+"</td><td><span class='av' style='--h:"+hue(r.sym)+"'>"+esc(r.sym.charAt(0))+"</span>"+nameHtml(r)+"<a class='sym' href='"+cmcUrl(r.slug)+"' target='_blank' rel='noopener'>"+esc(r.sym)+"</a></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td class='dn'>"+fp(r.fromHi)+"</td><td>"+fmt(r.lo)+"</td><td class='up'>"+fp(r.fromLo)+"</td>"+
+    "<td class='"+(r.ma120==null?"":r.price>r.ma120?"up":"dn")+"'>"+fmt(r.ma120)+"</td>"+
+    "<td class='sig'><span class='pill "+cl+"'>"+sg+"</span></td></tr>";
   }).join("");
   updateTiles();
 }
