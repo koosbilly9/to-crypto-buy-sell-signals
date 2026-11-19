@@ -29,7 +29,8 @@ th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
 .sym{color:var(--muted);font-size:12px;margin-left:6px;text-decoration:none}.sym:hover,.nm:hover{text-decoration:underline}.nm{color:var(--text);text-decoration:none;font-weight:600}
 .sig{font-weight:700;text-align:center}
 .buy{color:var(--buy)}.sell{color:var(--sell)}.none,.Stable{color:var(--muted)}.sig.buy,.sig.sell{font-weight:800}#tip{display:none;position:fixed;z-index:50;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;max-width:min(520px,92vw);box-shadow:0 8px 28px rgba(0,0,0,.35);text-align:left;white-space:normal}#tip h4{margin:8px 0 2px;font-size:13px}#tip h4:first-child{margin-top:0}#tip div{color:var(--muted)}.i{cursor:help;color:var(--accent);margin-left:3px}#reg{font-weight:600}.modal{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);overflow:auto}.modal .box{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:14px;max-width:640px;margin:0 auto;padding:18px 20px;font-size:14px;line-height:1.55}.modal h2{margin:0 0 8px;font-size:18px}.modal h3{margin:14px 0 4px;font-size:14px}.modal p{margin:0 0 8px;color:var(--muted)}.modal table{width:100%;min-width:0;border-collapse:collapse;font-size:13px;margin:6px 0 8px}.modal th,.modal td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:normal;position:static;cursor:default;font-size:13px}.modal th{color:var(--muted);font-size:12px}.modal ul{margin:0 0 8px;padding-left:18px;color:var(--muted)}.modal .warn{color:var(--text);font-weight:600}.modal button{margin-top:10px}button.lnk{background:none;border:0;padding:0;margin-left:6px;color:var(--accent);text-decoration:underline;font-size:12px;border-radius:0}
-.up{color:var(--buy)}.dn{color:var(--sell)}
+.up{color:var(--buy)}.dn{color:var(--sell)}.near-high{color:#ae5000}
+@media (prefers-color-scheme:dark){.near-high{color:#ffad5c}}
 footer{color:var(--muted);font-size:12px;padding:12px 0 20px;line-height:1.5}
 </style>
 <style>
@@ -111,7 +112,7 @@ footer{padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px));line-height:1
 </table></div>
 </section>
 <footer>
-RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles, and a level other than Normal needs all three to qualify. The looser Low thresholds only apply in a bull market and the looser High thresholds only in a bear market. The market regime is bull when Bitcoin trades above its 200-day average, otherwise bear. Prices and ranks: <a href="https://coinmarketcap.com" target="_blank" rel="noopener">Data provided by CoinMarketCap</a>. History: Binance (coins not listed there show n/a). A simple indicator view, not financial advice. <button class="lnk" id="privBtn">Privacy notice</button>
+RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles, and a level other than Normal needs all three to qualify. The looser Low thresholds only apply in a bull market and the looser High thresholds only in a bear market. The market regime is bull when Bitcoin trades above its 200-day average, otherwise bear. A price is orange when within 20% of its five-year high, otherwise green when below its 200-day average. Prices and ranks: <a href="https://coinmarketcap.com" target="_blank" rel="noopener">Data provided by CoinMarketCap</a>. History: Binance (coins not listed there show n/a). A simple indicator view, not financial advice. <button class="lnk" id="privBtn">Privacy notice</button>
 </footer>
 </main>
 <div id="tip"></div>
@@ -346,6 +347,12 @@ function fp(v){
   return (v>=0?"+":"−")+t+"%";
 }
 function f1(v){return v==null?"–":v.toFixed(1)}
+function priceClass(r){
+  if(!(r.price>0))return "";
+  if(r.hi>0&&r.price>=r.hi*0.8)return "near-high";
+  if(r.ma200!=null&&r.price<r.ma200)return "up";
+  return "";
+}
 function render(){
   var f=$("filter").value;
   rows.forEach(function(r){var l=level(r);r.lvl=l;r.score=l?l.s:0;var ok=r.price>0&&r.hi>0&&r.lo>0;r.fromHi=ok?(r.price/r.hi-1)*100:null;r.fromLo=ok?(r.price/r.lo-1)*100:null});
@@ -368,7 +375,7 @@ function render(){
     else if(r.lvl){sg=r.lvl.n;cl=r.lvl.s>0?"buy":"sell"}
     else{sg="Normal";cl="none"}
     var full=r.state==="ok";
-    return "<tr><td>"+r.rank+"</td><td><span class='av' style='--h:"+hue(r.sym)+"'>"+esc(r.sym.charAt(0))+"</span>"+nameHtml(r)+"<a class='sym' href='"+cmcUrl(r.slug)+"' target='_blank' rel='noopener'>"+esc(r.sym)+"</a></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td class='dn'>"+fp(r.fromHi)+"</td><td>"+fmt(r.lo)+"</td><td class='up'>"+fp(r.fromLo)+"</td>"+
+    return "<tr><td>"+r.rank+"</td><td><span class='av' style='--h:"+hue(r.sym)+"'>"+esc(r.sym.charAt(0))+"</span>"+nameHtml(r)+"<a class='sym' href='"+cmcUrl(r.slug)+"' target='_blank' rel='noopener'>"+esc(r.sym)+"</a></td><td class='"+priceClass(r)+"'>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td class='dn'>"+fp(r.fromHi)+"</td><td>"+fmt(r.lo)+"</td><td class='up'>"+fp(r.fromLo)+"</td>"+
     "<td class='"+(r.ma200==null?"":r.price>r.ma200?"up":"dn")+"'>"+fmt(r.ma200)+"</td>"+
     "<td class='sig'><span class='pill "+cl+"'>"+sg+"</span></td></tr>";
   }).join("");
