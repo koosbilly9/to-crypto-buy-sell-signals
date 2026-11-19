@@ -185,8 +185,8 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 </div></div>
 <script src="coins.js"></script>
 <script>
-var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["fromHi","% from 5y high"],["lo","5y low"],["fromLo","% from 5y low"],["ma120","MA 120"],["score","Price level"]];
-var REFRESH_HOURS=2,KEY="cs_cache_v3";
+var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["fromHi","% from 5y high"],["lo","5y low"],["fromLo","% from 5y low"],["ma200","MA 200"],["score","Price level"]];
+var REFRESH_HOURS=2,KEY="cs_cache_v4";
 var lastT=null;
 var rows=[],sortKey="rank",sortDir=1,bull=null;
 var $=function(id){return document.getElementById(id)};
@@ -260,7 +260,7 @@ function loadCoin(c){
     if(d.length<40)throw new Error("no history");
     var cl=d.map(function(x){return +x[4]}),hi=d.map(function(x){return +x[2]}),lo=d.map(function(x){return +x[3]}),vo=d.map(function(x){return +x[5]});
     c.hi=Math.max.apply(null,hi);c.lo=Math.min.apply(null,lo);
-    c.ma30=sma(cl,30);c.ma90=sma(cl,90);c.ma120=sma(cl,120);
+    c.ma30=sma(cl,30);c.ma90=sma(cl,90);c.ma200=sma(cl,200);
     var rs=rsiSeries(cl,14);
     c.rsi=rs.length?rs[rs.length-1]:null;
     c.srsi=stochRsi(rs,14,3);
@@ -369,7 +369,7 @@ function render(){
     else{sg="Normal";cl="none"}
     var full=r.state==="ok";
     return "<tr><td>"+r.rank+"</td><td><span class='av' style='--h:"+hue(r.sym)+"'>"+esc(r.sym.charAt(0))+"</span>"+nameHtml(r)+"<a class='sym' href='"+cmcUrl(r.slug)+"' target='_blank' rel='noopener'>"+esc(r.sym)+"</a></td><td>"+fmt(r.price)+"</td><td>"+fmt(r.hi)+"</td><td class='dn'>"+fp(r.fromHi)+"</td><td>"+fmt(r.lo)+"</td><td class='up'>"+fp(r.fromLo)+"</td>"+
-    "<td class='"+(r.ma120==null?"":r.price>r.ma120?"up":"dn")+"'>"+fmt(r.ma120)+"</td>"+
+    "<td class='"+(r.ma200==null?"":r.price>r.ma200?"up":"dn")+"'>"+fmt(r.ma200)+"</td>"+
     "<td class='sig'><span class='pill "+cl+"'>"+sg+"</span></td></tr>";
   }).join("");
   updateTiles();
