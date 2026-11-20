@@ -1,0 +1,13 @@
+name = "crypto-proxy"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-11-20"
+workers_dev = true
+
+# Choose a positive namespace_id that is unique in your Cloudflare account.
+[[ratelimits]]
+name = "CMC_RATE_LIMITER"
+namespace_id = "2026112001"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

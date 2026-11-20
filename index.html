@@ -50,13 +50,33 @@ button.lnk{border-radius:0;font-weight:400}
 .hero p{color:var(--muted);font-size:clamp(15px,2vw,18px);line-height:1.55;max-width:56ch;margin:0}
 .hero .quote{margin-top:16px;font-style:italic;color:var(--text);font-size:15px}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}}
-.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:6px 0 22px}
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:6px 0 22px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
 .tile .k{color:var(--muted);font-size:13px}.tile .v{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:4px 0 2px}.tile .n{color:var(--muted);font-size:12px}
+.tile.wall a{display:block;color:var(--accent);font-size:13px;margin-top:8px}
+.fear-greed{display:flex;flex-direction:column;align-items:flex-start;align-self:start;gap:2px;font-size:12px;line-height:1.4}
+.fear-greed a{color:var(--accent)}
+.fng-gauge{position:relative;width:min(150px,100%)}
+.fng-gauge svg{display:block;width:100%;height:auto}
+.fng-gauge strong{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
 .bar{height:3px;border-radius:0;margin:0;background:transparent}.bar i{transition:width .25s}
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px 10px;flex-wrap:wrap}
 .toolbar h2{margin:0;font-size:17px;letter-spacing:-.01em}
+.chart-card{--chart-ma:#7350b9;--chart-high:#a74b00;--chart-low:#006d78;--chart-overall:#087b41;margin-bottom:20px}
+@media(prefers-color-scheme:dark){.chart-card{--chart-ma:#bba5ff;--chart-high:#ffad5c;--chart-low:#63d5dc;--chart-overall:var(--buy)}}
+.chart-controls{display:flex;flex-wrap:wrap;gap:8px 14px}
+.chart-controls label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.chart-content{padding:0 18px 16px}
+.chart-status,.chart-readout,.chart-note{color:var(--muted);font-size:12px;line-height:1.5;margin:6px 0}
+.chart-legend{display:flex;flex-wrap:wrap;gap:8px 14px;border:0;margin:10px 0;padding:0}
+.chart-legend legend{color:var(--muted);font-size:12px;margin-bottom:6px}
+.chart-legend label{display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer}
+.chart-legend label[hidden],.chart-legend[hidden],.chart-svg[hidden]{display:none}
+.chart-swatch{width:16px;height:3px;border-radius:2px;background:var(--series-color)}
+.chart-value{color:var(--muted);font-variant-numeric:tabular-nums}
+.chart-svg{display:block;width:100%;height:300px;touch-action:pan-y}
+.chart-svg text{font-family:inherit}
 .msg{padding:0 18px 12px;margin:0}
 .wrap{border:0;border-radius:0;border-top:1px solid var(--line)}
 table{min-width:900px}th{background:var(--card);padding:11px 12px;border-bottom:1px solid var(--line)}th:hover{color:var(--text)}
@@ -67,7 +87,7 @@ td.sig{text-align:center}
 .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:600;background:var(--line);color:var(--muted)}.pill.buy{background:var(--buy-bg);color:var(--buy)}.pill.sell{background:var(--sell-bg);color:var(--sell)}
 footer{padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px));line-height:1.6;max-width:90ch}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-@media(max-width:860px){.tiles{grid-template-columns:repeat(2,1fr)}.page{padding:0 14px}nav.top .in{padding:10px 14px}.hero{padding-top:30px}}
+@media(max-width:860px){.tiles{grid-template-columns:repeat(2,1fr)}.fear-greed{grid-column:1/-1}.page{padding:0 14px}nav.top .in{padding:10px 14px}.hero{padding-top:30px}}
 @media(prefers-reduced-motion:reduce){.hero{animation:none}*{transition:none!important}}
 .modal .box.wide{max-width:920px}
 .modal input,.modal select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0;width:100%}
@@ -96,10 +116,46 @@ footer{padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px));line-height:1
   <div class="quote">&ldquo;Buy Low, Sell High&rdquo;</div>
 </section>
 <section class="tiles">
+  <div class="tile wall">
+    <div class="k">Wall</div>
+    <a href="https://en.macromicro.me/charts/143271/bitcoin-realized-price" target="_blank" rel="noopener">Bitcoin realized price</a>
+    <a href="https://www.coinglass.com/LiquidityHeatmap/BTC" target="_blank" rel="noopener">BTC liquidity heatmap</a>
+  </div>
   <div class="tile"><div class="k">Market regime</div><div class="v" id="tReg">…</div><div class="n" id="tRegN">Bitcoin vs its 200-day average</div></div>
   <div class="tile"><div class="k">Low or very low</div><div class="v" id="tLow">–</div><div class="n">coins at low price levels</div></div>
   <div class="tile"><div class="k">High or very high</div><div class="v" id="tHigh">–</div><div class="n">coins at high price levels</div></div>
   <div class="tile"><div class="k">Last updated</div><div class="v" id="tUpd">–</div><div class="n" id="tUpdN">Loading…</div></div>
+  <div class="fear-greed">
+    <span>BTC Fear &amp; Greed</span>
+    <div class="fng-gauge">
+      <svg viewBox="0 0 180 120" aria-hidden="true">
+        <defs><linearGradient id="fngGradient"><stop offset="0%" stop-color="var(--sell)"/><stop offset="50%" stop-color="var(--hold)"/><stop offset="100%" stop-color="var(--buy)"/></linearGradient></defs>
+        <path d="M 14 90 A 76 76 0 0 1 166 90" fill="none" stroke="url(#fngGradient)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 14 90 H 24 M 36 36 L 43 43 M 90 14 V 24 M 144 36 L 137 43 M 166 90 H 156" fill="none" stroke="var(--bg)" stroke-width="2"/>
+        <g id="fngNeedle" visibility="hidden"><line x1="90" y1="90" x2="23" y2="90" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/><circle cx="90" cy="90" r="4" fill="var(--text)"/></g>
+        <g fill="var(--muted)" font-size="11" text-anchor="middle"><text x="14" y="111">0</text><text x="166" y="111">100</text></g>
+      </svg>
+      <strong id="fngValue" aria-live="polite">…</strong>
+    </div>
+    <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">Alternative.me</a>
+  </div>
+</section>
+<section class="card chart-card" aria-labelledby="chartTitle">
+  <div class="toolbar">
+    <h2 id="chartTitle">30-day price history</h2>
+    <div class="chart-controls">
+      <label>Coin <select id="chartCoin" aria-label="Chart coin" disabled><option>Loading…</option></select></label>
+      <label>View <select id="chartScale" aria-label="Chart scale"><option value="all">Fit all levels</option><option value="focus">Focus on 30-day prices</option></select></label>
+    </div>
+  </div>
+  <div class="chart-content">
+    <p class="chart-status" id="chartStatus" role="status">Loading market data…</p>
+    <p class="chart-status" id="chartPrefNotice" role="status"></p>
+    <fieldset class="chart-legend" id="chartLegend" hidden><legend>Visible lines</legend></fieldset>
+    <svg class="chart-svg" id="chartSvg" role="img" tabindex="0" aria-label="Thirty-day price chart. Use the left and right arrow keys to inspect daily values." aria-describedby="chartReadout" hidden></svg>
+    <p class="chart-readout" id="chartReadout" aria-live="polite"></p>
+    <p class="chart-note">Daily Binance USDT closes are shown as approximate USD; today&rsquo;s incomplete candle is excluded from the chart. The rolling MA200 uses completed closes. Five-year extremes include the latest available candle. BTC realized prices are fixed defaults, not live, and are not shown for other coins.</p>
+  </div>
 </section>
 <section class="card">
 <div class="bar"><i id="prog"></i></div>
@@ -145,7 +201,7 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 <h3>Risks</h3>
 <p>Cryptocurrencies are highly volatile and you can lose some or all of the money you put in. Technical indicators are based on past prices and do not predict the future. A coin can look oversold or overbought for a long time, and the levels can be wrong.</p>
 <h3>Data accuracy</h3>
-<p>Prices and rankings come from CoinMarketCap and price history from Binance. Data may be delayed, incomplete or wrong, may differ from other sources, and is saved in your browser for a couple of hours. Coins not listed on Binance have no indicators. Website links are provided for convenience and may be outdated.</p>
+<p>Prices and rankings come from CoinMarketCap and price history from Binance. Data may be delayed, incomplete or wrong, may differ from other sources, and is saved in your browser for a couple of hours. The chart uses up to 30 completed UTC daily closes and a rolling MA200. Bitcoin Fear &amp; Greed is Alternative.me&rsquo;s daily Bitcoin-based index (0 means extreme fear, 100 means extreme greed), fetched when the page opens or Refresh is pressed. The chart&rsquo;s Bitcoin realized prices are fixed defaults, not live data, and are not used for other coins. Coins not listed on Binance have no indicators. Website links are provided for convenience and may be outdated.</p>
 <h3>No liability</h3>
 <p>This page is provided as is, without warranties of any kind. To the fullest extent permitted by law, its creator accepts no responsibility for any loss or damage arising from its use or from reliance on its content. Do your own research. This page is not affiliated with or endorsed by CoinMarketCap, Binance or any listed project.</p>
 <button class="p" id="aboutClose">Close</button>
@@ -172,10 +228,10 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 <h3>What we collect</h3>
 <p>This page has no accounts, sign-ups or forms, and we do not ask for or store your name, email address or other personal details.</p>
 <h3>What is stored on your device</h3>
-<p>To load faster and to respect data-provider limits, the page saves the latest market data in your browser&rsquo;s local storage. It stays on your device, contains no personal information and is not sent to us. You can clear it in your browser settings.</p>
+<p>To load faster and to respect data-provider limits, the page saves the latest coin prices, indicators, chart history and chart settings in your browser&rsquo;s local storage. They stay on your device, contain no personal information and are not sent to us. You can clear them in your browser settings. Bitcoin Fear &amp; Greed is fetched separately and is not saved.</p>
 <p>If you use the Portfolio feature, the coins, amounts and buy prices you enter are saved in your browser&rsquo;s local storage on this device. They are never sent to us or to anyone else, and they will not appear on your other devices or browsers. You can remove them with Delete all in the Portfolio window or by clearing your browser data.</p>
 <h3>Third parties</h3>
-<p>When you open the page, your browser requests market data directly from CoinMarketCap and Binance, and the page itself is hosted on GitHub Pages. These providers can see technical information such as your IP address and browser type, and handle it under their own privacy policies. Links on the page open third-party sites that have their own policies.</p>
+<p>When you open the page, your browser requests market data from CoinMarketCap, Binance and Alternative.me, and the page itself is hosted on GitHub Pages. These providers can see technical information such as your IP address and browser type, and handle it under their own privacy policies. Links on the page open third-party sites that have their own policies.</p>
 <h3>Analytics</h3>
 <p id="privAn">At the moment no analytics are running. If we turn on analytics, it will be Cloudflare Web Analytics, which counts visits and pages in aggregate without cookies or tracking you across other sites, and this notice will be updated.</p>
 <h3>Ads and affiliate links</h3>
@@ -185,16 +241,18 @@ RSI, Stoch RSI (14, 14, smoothed 3) and MFI (14) are calculated on daily candles
 <button class="p" id="privClose">Close</button>
 </div></div>
 <script src="coins.js"></script>
+<script src="chart.js"></script>
 <script>
 var COLS=[["rank","#"],["name","Coin"],["price","Price"],["hi","5y high"],["fromHi","% from 5y high"],["lo","5y low"],["fromLo","% from 5y low"],["ma200","MA 200"],["score","Price level"]];
 var REFRESH_HOURS=2,KEY="cs_cache_v4";
-var lastT=null;
+var lastT=null,marketError=null;
 var rows=[],sortKey="rank",sortDir=1,bull=null;
 var $=function(id){return document.getElementById(id)};
 var PROXY="https://crypto-proxy.koosbilly9.workers.dev/listings"; // your Cloudflare Worker address, e.g. "https://crypto-proxy.yourname.workers.dev/listings"
 var CMC_LIST=PROXY||"https://pro-api.coinmarketcap.com/public-api/v1/cryptocurrency/listings/latest?start=1&limit=50&convert=USD&sort=market_cap&sort_dir=desc";
 var CF_TOKEN=""; // Cloudflare Web Analytics token (leave empty to disable analytics)
 var BIN="https://data-api.binance.vision/api/v3/klines?interval=1d&limit=1000&symbol=";
+var FNG="https://api.alternative.me/fng/",fngLoading=false;
 var STABLES=["USDT","USDC","DAI","USDE","USDS","FDUSD","PYUSD","TUSD","USDD","USD1","BUIDL","USDY","USDG","USDTB","FRAX","BSC-USD"];
 var TIP='<h4>Very Low</h4><div>RSI < 30, Stoch RSI < 10, MFI < 15 on daily</div>'+
 '<h4>Low</h4><div>RSI < 35, Stoch RSI ≤ 20, MFI ≤ 20 on daily. In a bull market also: RSI ≤ 40, Stoch RSI ≤ 25, MFI ≤ 25</div>'+
@@ -247,20 +305,46 @@ function level(r){
   if(bull===false&&a>=75&&b>=80&&m>=75)return {n:"High",s:-1};
   return null;
 }
-function getJSON(url){
-  return fetch(url).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()});
+function getJSON(url,options){
+  return fetch(url,options).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()});
+}
+function loadFearGreed(){
+  if(fngLoading)return;
+  fngLoading=true;
+  var el=$("fngValue"),needle=$("fngNeedle"),controller=new AbortController(),timer=setTimeout(function(){controller.abort()},10000);
+  needle.setAttribute("visibility","hidden");
+  el.textContent="…";el.title="Loading Bitcoin Fear & Greed";
+  getJSON(FNG,{signal:controller.signal}).then(function(j){
+    if(!j||!Array.isArray(j.data)||!j.data.length||(j.metadata&&j.metadata.error))throw new Error("Invalid index response");
+    var d=j.data[0],value=d&&d.value,n=typeof value==="string"&&value.trim()!==""?Number(value):value;
+    var timestamp=d&&d.timestamp;timestamp=typeof timestamp==="string"&&timestamp.trim()!==""?Number(timestamp):timestamp;
+    var date=new Date(timestamp*1000);
+    if(!Number.isInteger(n)||n<0||n>100||!Number.isInteger(timestamp)||timestamp<=0||isNaN(date.getTime()))throw new Error("Invalid index value or date");
+    el.textContent=String(n);
+    el.title=(typeof d.value_classification==="string"?d.value_classification+" · ":"")+"as of "+date.toISOString().slice(0,10)+" UTC (0 = extreme fear, 100 = extreme greed)";
+    needle.setAttribute("transform","rotate("+(n*1.8)+" 90 90)");needle.setAttribute("visibility","visible");
+  }).catch(function(e){
+    el.textContent="n/a";el.title="Couldn’t load Bitcoin Fear & Greed: "+(e.name==="AbortError"?"Request timed out":e.message);
+    console.warn("Couldn’t load Bitcoin Fear & Greed:",e);
+  }).finally(function(){clearTimeout(timer);fngLoading=false});
 }
 function klines(sym,end){return getJSON(BIN+encodeURIComponent(sym)+"USDT"+(end?"&endTime="+end:""))}
 function loadCoin(c){
   c.state="ok";
   if(STABLES.indexOf(c.sym)>=0){c.state="stable";return Promise.resolve()}
+  c.historyLoading=true;
   return klines(c.sym).then(function(a){
     if(a.length>=1000)return klines(c.sym,a[0][0]-1).then(function(b){return b.concat(a)});
     return a;
   }).then(function(d){
-    if(d.length<40)throw new Error("no history");
-    var cl=d.map(function(x){return +x[4]}),hi=d.map(function(x){return +x[2]}),lo=d.map(function(x){return +x[3]}),vo=d.map(function(x){return +x[5]});
-    c.hi=Math.max.apply(null,hi);c.lo=Math.min.apply(null,lo);
+    var chart=PriceChart.processCandles(d,Date.now()),cl=chart.closes;
+    c.chartHistory=chart.points;
+    if(d.length<40){
+      c.chartHigh=chart.high;c.chartLow=chart.low;
+      throw new Error("fewer than 40 daily candles for indicators");
+    }
+    var hi=d.map(function(x){return +x[2]}),lo=d.map(function(x){return +x[3]}),vo=d.map(function(x){return +x[5]});
+    c.hi=chart.high;c.lo=chart.low;
     c.ma30=sma(cl,30);c.ma90=sma(cl,90);c.ma200=sma(cl,200);
     var rs=rsiSeries(cl,14);
     c.rsi=rs.length?rs[rs.length-1]:null;
@@ -268,7 +352,10 @@ function loadCoin(c){
     c.mfi=mfi(hi,lo,cl,vo,14);
     if(c.hi<1.5&&c.lo>0.5)c.state="stable";
     if(c.sym==="BTC"){var m=sma(cl,200);if(m!=null){bull=c.price>m;showReg()}}
-  }).catch(function(){c.state="na"});
+  }).catch(function(e){
+    c.state="na";c.historyError=e.message;
+    console.warn("Couldn’t load Binance history for "+c.sym+":",e);
+  }).then(function(){delete c.historyLoading});
 }
 function showReg(){
   $("reg").textContent=bull===null?"":"Market regime: "+(bull?"Bull (Bitcoin above its 200-day average), so the looser Low thresholds apply":"Bear (Bitcoin below its 200-day average), so the looser High thresholds apply");
@@ -379,7 +466,7 @@ function render(){
     "<td class='"+(r.ma200==null?"":r.price>r.ma200?"up":"dn")+"'>"+fmt(r.ma200)+"</td>"+
     "<td class='sig'><span class='pill "+cl+"'>"+sg+"</span></td></tr>";
   }).join("");
-  updateTiles();
+  updateTiles();PriceChart.sync(rows,lastT,marketError);
 }
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
 
@@ -406,22 +493,27 @@ function showTip(){
 function hideTip(){$("tip").style.display="none"}
 function toggleTip(){$("tip").style.display==="block"?hideTip():showTip()}
 document.addEventListener("click",function(e){if(e.target.id!=="ii")hideTip()});
-function readCache(){try{var j=JSON.parse(localStorage.getItem(KEY));return j&&j.rows&&j.rows.length&&j.t?j:null}catch(e){return null}}
-function saveCache(){try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),bull:bull,rows:rows}))}catch(e){}}
+function readCache(){try{var j=JSON.parse(localStorage.getItem(KEY));return j&&j.rows&&j.rows.length&&j.t?j:null}catch(e){console.warn("Couldn’t read saved market data:",e);return null}}
+function saveCache(){try{localStorage.setItem(KEY,JSON.stringify({t:Date.now(),bull:bull,rows:rows}));return true}catch(e){console.warn("Couldn’t save market data:",e);return false}}
 function hhmm(t){return new Date(t).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
 function fresh(c){return c&&Date.now()<c.t+REFRESH_HOURS*3600000}
 function useCache(c,note){
-  lastT=c.t;rows=c.rows;bull=c.bull;showReg();render();$("prog").style.width="100%";
+  marketError=null;lastT=c.t;rows=c.rows;bull=c.bull;showReg();render();$("prog").style.width="100%";
   $("msg").textContent=note+" Saved data from "+new Date(c.t).toLocaleString()+". Next refresh available after "+hhmm(c.t+REFRESH_HOURS*3600000)+".";
 }
 function click(){
+  loadFearGreed();
   var c=readCache();
   if(fresh(c)){useCache(c,"Data is up to date.");return}
+  if(rows.length&&lastT&&fresh({t:lastT})){
+    $("msg").textContent="Data is up to date in this tab. Browser storage did not retain the latest snapshot; next refresh available after "+hhmm(lastT+REFRESH_HOURS*3600000)+".";
+    return;
+  }
   run();
 }
 function run(){
   var old=readCache();
-  $("go").disabled=true;$("prog").style.width="0";rows=[];bull=null;showReg();render();
+  marketError=null;$("go").disabled=true;$("prog").style.width="0";rows=[];bull=null;showReg();render();
   $("msg").textContent="Loading top 50 by market cap…";
   getJSON(CMC_LIST).then(function(j){
     var list=j&&j.data;
@@ -444,14 +536,15 @@ function run(){
     }
     return Promise.all([next(),next(),next()]);
   }).then(function(){
-    lastT=Date.now();render();saveCache();
-    $("msg").textContent="Updated "+new Date().toLocaleString()+". Next refresh available after "+hhmm(Date.now()+REFRESH_HOURS*3600000)+". Hover (or tap ⓘ) on Price level for the rules.";
+    lastT=Date.now();render();var saved=saveCache();
+    $("msg").textContent="Updated "+new Date().toLocaleString()+". Next refresh available after "+hhmm(Date.now()+REFRESH_HOURS*3600000)+". Hover (or tap ⓘ) on Price level for the rules."+(saved?"":" Couldn’t save market data in this browser.");
   }).catch(function(e){
     if(old)useCache(old,"Couldn’t refresh ("+e.message+").");
-    else $("msg").textContent="Couldn’t load data ("+e.message+"). "+(PROXY?"Wait a minute and tap Refresh.":"The data source blocks direct browser requests, so the data proxy needs to be set up.");
+    else{marketError=e.message;$("msg").textContent="Couldn’t load data ("+e.message+"). "+(PROXY?"Wait a minute and tap Refresh.":"The data source blocks direct browser requests, so the data proxy needs to be set up.");render()}
   }).then(function(){$("go").disabled=false});
 }
 pfLoad();
+PriceChart.init();
 buildHead();
 $("go").onclick=click;
 $("aboutBtn").onclick=function(){$("about").style.display="block"};
@@ -484,6 +577,7 @@ if(CF_TOKEN){
 }
 document.addEventListener("keydown",function(e){if(e.key==="Escape"){$("about").style.display="none";$("privacy").style.display="none";$("pfm").style.display="none"}});
 $("filter").onchange=render;
+loadFearGreed();
 (function(){var c=readCache();if(fresh(c))useCache(c,"Loaded from saved data.");else run()})();
 </script>
 </body>
