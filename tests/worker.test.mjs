@@ -121,6 +121,45 @@ test("serves supported index history and rejects unknown symbols", async () => {
   });
 });
 
+test("falls back to Stooq CSV and Yahoo Finance HTML scraping when primary API fails", async () => {
+  await withFetch(async (url) => {
+    if (url.startsWith("https://query1.finance.yahoo.com/")) {
+      return new Response("blocked", { status: 429 });
+    }
+    if (url === "https://stooq.com/q/d/l/?s=%5Espx&i=d") {
+      return new Response("Date,Open,High,Low,Close,Volume\n2026-11-19,5900,5950,5880,5920,1000\n", {
+        headers: { "Content-Type": "text/csv" },
+      });
+    }
+    throw new Error(`unexpected url: ${url}`);
+  }, async () => {
+    const response = await worker.fetch(request("/history?asset=sp500"), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.source, "Stooq CSV API");
+    assert.deepEqual(body.points, [[Date.UTC(2026, 10, 19), 5920, 5950, 5880]]);
+  });
+
+  await withFetch(async (url) => {
+    if (url.startsWith("https://query1.finance.yahoo.com/") || url.startsWith("https://stooq.com/")) {
+      return new Response("unavailable", { status: 503 });
+    }
+    if (url === "https://finance.yahoo.com/quote/%5ENDX/history/") {
+      return new Response(
+        "<table><tbody><tr><td>Nov 19, 2026</td><td>20,500.00</td><td>20,650.50</td><td>20,400.25</td><td>20,600.00</td><td>20,600.00</td><td>1,000</td></tr></tbody></table>",
+        { headers: { "Content-Type": "text/html" } },
+      );
+    }
+    throw new Error(`unexpected url: ${url}`);
+  }, async () => {
+    const response = await worker.fetch(request("/history?asset=nasdaq100"), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.source, "Yahoo Finance HTML");
+    assert.deepEqual(body.points, [[Date.UTC(2026, 10, 19), 20600, 20650.5, 20400.25]]);
+  });
+});
+
 test("requires a working rate-limit binding and keys its limit by client IP", async () => {
   await withFetch(async () => {
     throw new Error("upstream must not be called");

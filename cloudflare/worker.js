@@ -13,6 +13,13 @@ const YAHOO_SYMBOLS = {
   sp500: "^GSPC",
   nasdaq100: "^NDX",
 };
+const STOOQ_SYMBOLS = {
+  sp500: "^spx",
+  nasdaq100: "^ndx",
+};
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const FIVE_YEARS_MS = 5 * 365.25 * 86400000;
 const UPSTREAM_CACHE = {
   cacheEverything: true,
   cacheTtlByStatus: {
@@ -32,78 +39,189 @@ function jsonResponse(body, status, headers) {
   });
 }
 
-async function proxyHistory(asset, cors) {
-  const symbol = YAHOO_SYMBOLS[asset];
-  if (!symbol) {
-    return jsonResponse({ error: "Unsupported market history asset" }, 400, cors);
+function normalizePoints(rawPoints, currentUtcDay) {
+  const cutoff = currentUtcDay - FIVE_YEARS_MS;
+  const byDay = new Map();
+  for (const [rawTime, rawClose, rawHigh, rawLow] of rawPoints) {
+    const close = Number(rawClose);
+    const high = rawHigh != null ? Number(rawHigh) : close;
+    const low = rawLow != null ? Number(rawLow) : close;
+    if (!Number.isSafeInteger(rawTime) || rawTime < cutoff || rawTime >= currentUtcDay ||
+        !Number.isFinite(close) || close <= 0 ||
+        !Number.isFinite(high) || !Number.isFinite(low) ||
+        high < close || low > close || high < low || low <= 0) {
+      continue;
+    }
+    byDay.set(rawTime, [rawTime, close, high, low]);
   }
+  return [...byDay.values()].sort((a, b) => a[0] - b[0]);
+}
 
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
-  let upstream;
-  try {
-    upstream = await fetch(url, {
-      headers: { Accept: "application/json" },
-      redirect: "manual",
-      cf: UPSTREAM_CACHE,
-      signal: controller.signal,
-    });
-  } catch (error) {
-    console.error("Yahoo Finance request failed:", error);
-    return jsonResponse({ error: "Market history request failed" }, 502, cors);
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!upstream.ok) {
-    console.error("Yahoo Finance returned HTTP", upstream.status);
-    return jsonResponse({ error: "Market history request failed" }, 502, cors);
-  }
-
-  let payload;
-  try {
-    payload = await upstream.json();
-  } catch (error) {
-    console.error("Yahoo Finance returned invalid JSON:", error);
-    return jsonResponse({ error: "Market history response was invalid" }, 502, cors);
-  }
-
+function parseYahooChartJson(payload, currentUtcDay) {
   const result = payload && payload.chart && Array.isArray(payload.chart.result) && payload.chart.result[0];
   const timestamps = result && result.timestamp;
-  const quote = result && result.indicators && result.indicators.quote &&
-    result.indicators.quote[0];
+  const quote = result && result.indicators && result.indicators.quote && result.indicators.quote[0];
   const closes = quote && quote.close;
   const highs = quote && quote.high;
   const lows = quote && quote.low;
   if (!Array.isArray(timestamps) || !Array.isArray(closes) || timestamps.length !== closes.length) {
-    console.error("Yahoo Finance returned an invalid chart.");
-    return jsonResponse({ error: "Market history response was invalid" }, 502, cors);
+    return null;
+  }
+  const raw = [];
+  for (let i = 0; i < timestamps.length; i++) {
+    raw.push([
+      timestamps[i] * 1000,
+      closes[i],
+      Array.isArray(highs) ? highs[i] : closes[i],
+      Array.isArray(lows) ? lows[i] : closes[i],
+    ]);
+  }
+  const points = normalizePoints(raw, currentUtcDay);
+  return points.length ? { currency: (result.meta && result.meta.currency) || "USD", points } : null;
+}
+
+function parseStooqCsv(csv, currentUtcDay) {
+  if (typeof csv !== "string" || !csv.trim()) return null;
+  const lines = csv.trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+  const raw = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",");
+    if (cols.length < 5) continue;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(cols[0].trim());
+    if (!match) continue;
+    const time = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    raw.push([time, Number(cols[4]), Number(cols[2]), Number(cols[3])]);
+  }
+  const points = normalizePoints(raw, currentUtcDay);
+  return points.length ? { currency: "USD", points } : null;
+}
+
+function parseYahooHistoryHtml(html, currentUtcDay) {
+  if (typeof html !== "string" || !html.trim()) return null;
+  const raw = [];
+
+  const pricesMatch = /"prices"\s*:\s*(\[\{[\s\S]*?\}\])/.exec(html);
+  if (pricesMatch) {
+    try {
+      const prices = JSON.parse(pricesMatch[1]);
+      for (const item of prices) {
+        if (item && Number.isFinite(item.date) && Number.isFinite(item.close)) {
+          raw.push([item.date * 1000, item.close, item.high ?? item.close, item.low ?? item.close]);
+        }
+      }
+    } catch {
+      // Fall through to HTML table parsing.
+    }
+  }
+
+  if (!raw.length) {
+    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(html)) !== null) {
+      const cells = [];
+      const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+      let cellMatch;
+      while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
+        cells.push(cellMatch[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim());
+      }
+      if (cells.length < 5) continue;
+      const parsedDate = Date.parse(`${cells[0]} UTC`);
+      if (!Number.isFinite(parsedDate)) continue;
+      const d = new Date(parsedDate);
+      const time = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      const high = Number(cells[2].replace(/,/g, ""));
+      const low = Number(cells[3].replace(/,/g, ""));
+      const close = Number(cells[4].replace(/,/g, ""));
+      raw.push([time, close, high, low]);
+    }
+  }
+
+  const points = normalizePoints(raw, currentUtcDay);
+  return points.length ? { currency: "USD", points } : null;
+}
+
+async function fetchWithTimeout(url, accept) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    return await fetch(url, {
+      headers: {
+        Accept: accept,
+        "User-Agent": BROWSER_UA,
+      },
+      redirect: "manual",
+      cf: UPSTREAM_CACHE,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function proxyHistory(asset, cors) {
+  const symbol = YAHOO_SYMBOLS[asset];
+  const stooqSymbol = STOOQ_SYMBOLS[asset];
+  if (!symbol || !stooqSymbol) {
+    return jsonResponse({ error: "Unsupported market history asset" }, 400, cors);
   }
 
   const now = new Date();
   const currentUtcDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const points = [];
-  for (let i = 0; i < timestamps.length; i++) {
-    const time = timestamps[i] * 1000;
-    const close = closes[i];
-    const high = Array.isArray(highs) ? highs[i] : close;
-    const low = Array.isArray(lows) ? lows[i] : close;
-    if (Number.isSafeInteger(time) && time > 0 && time < currentUtcDay &&
-        Number.isFinite(close) && close > 0 &&
-        Number.isFinite(high) && Number.isFinite(low) &&
-        high >= close && low <= close && high >= low && low > 0) {
-      points.push([time, close, high, low]);
+
+  const sources = [
+    {
+      name: "Yahoo Finance API",
+      url: `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`,
+      accept: "application/json",
+      parse: async (res) => parseYahooChartJson(await res.json(), currentUtcDay),
+    },
+    {
+      name: "Stooq CSV API",
+      url: `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSymbol)}&i=d`,
+      accept: "text/csv,text/plain;q=0.9,*/*;q=0.8",
+      parse: async (res) => parseStooqCsv(await res.text(), currentUtcDay),
+    },
+    {
+      name: "Yahoo Finance HTML",
+      url: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`,
+      accept: "text/html,application/xhtml+xml",
+      parse: async (res) => parseYahooHistoryHtml(await res.text(), currentUtcDay),
+    },
+  ];
+
+  let sawUpstreamOk = false;
+  for (const source of sources) {
+    let upstream;
+    try {
+      upstream = await fetchWithTimeout(source.url, source.accept);
+    } catch (error) {
+      console.error(`${source.name} request failed:`, error);
+      continue;
+    }
+    if (!upstream.ok) {
+      console.error(`${source.name} returned HTTP`, upstream.status);
+      continue;
+    }
+    sawUpstreamOk = true;
+    try {
+      const parsed = await source.parse(upstream);
+      if (parsed && parsed.points.length) {
+        return jsonResponse({ symbol, currency: parsed.currency, source: source.name, points: parsed.points }, 200, {
+          ...cors,
+          "Cache-Control": "public, max-age=900",
+        });
+      }
+    } catch (error) {
+      console.error(`${source.name} parse failed:`, error);
     }
   }
-  if (!points.length) {
-    return jsonResponse({ error: "Market history was empty" }, 502, cors);
-  }
 
-  return jsonResponse({ symbol, currency: result.meta && result.meta.currency, points }, 200, {
-    ...cors,
-    "Cache-Control": "public, max-age=900",
-  });
+  return jsonResponse(
+    { error: sawUpstreamOk ? "Market history response was invalid" : "Market history request failed" },
+    502,
+    cors,
+  );
 }
 
 export default {
