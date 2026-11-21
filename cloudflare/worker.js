@@ -17,6 +17,14 @@ const STOOQ_SYMBOLS = {
   sp500: "^spx",
   nasdaq100: "^ndx",
 };
+const MONEYWEB_FUNDS = {
+  coronation: {
+    code: "CNTF",
+    title: "Coronation Top 20 Fund (A)",
+    currency: "ZAR",
+    referer: "https://www.moneyweb.co.za/tools-and-data/click-a-unit-trust/CNTF/",
+  },
+};
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const FIVE_YEARS_MS = 5 * 365.25 * 86400000;
@@ -141,15 +149,36 @@ function parseYahooHistoryHtml(html, currentUtcDay) {
   return points.length ? { currency: "USD", points } : null;
 }
 
-async function fetchWithTimeout(url, accept) {
+function parseMoneywebGraphJson(payload, code, currentUtcDay, currency = "ZAR") {
+  const rows = payload && Array.isArray(payload[code]) ? payload[code] : null;
+  if (!rows || !rows.length) return null;
+  const raw = [];
+  for (const item of rows) {
+    if (!item || typeof item.dt !== "string") continue;
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(item.dt.trim());
+    if (!match) continue;
+    const time = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    const cents = item.c != null ? Number(item.c) : NaN;
+    const rands = item.i != null ? Number(item.i) : NaN;
+    const value = Number.isFinite(cents) && cents > 0 ? cents / 100 : rands;
+    raw.push([time, value, value, value]);
+  }
+  const points = normalizePoints(raw, currentUtcDay);
+  return points.length ? { currency, points } : null;
+}
+
+async function fetchWithTimeout(url, accept, extraOptions = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
   try {
     return await fetch(url, {
+      method: extraOptions.method || "GET",
       headers: {
         Accept: accept,
         "User-Agent": BROWSER_UA,
+        ...extraOptions.headers,
       },
+      body: extraOptions.body,
       redirect: "manual",
       cf: UPSTREAM_CACHE,
       signal: controller.signal,
@@ -162,39 +191,71 @@ async function fetchWithTimeout(url, accept) {
 async function proxyHistory(asset, cors) {
   const symbol = YAHOO_SYMBOLS[asset];
   const stooqSymbol = STOOQ_SYMBOLS[asset];
-  if (!symbol || !stooqSymbol) {
+  const moneyweb = MONEYWEB_FUNDS[asset];
+  if (!symbol && !moneyweb) {
     return jsonResponse({ error: "Unsupported market history asset" }, 400, cors);
   }
 
   const now = new Date();
   const currentUtcDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 
-  const sources = [
-    {
+  const sources = [];
+  if (moneyweb) {
+    const form = new URLSearchParams({
+      action: "mny_load_graphs",
+      "instruments[0][code]": moneyweb.code,
+      "instruments[0][title]": moneyweb.title,
+      "instruments[0][type]": "fund",
+      graphType: "fund",
+      graphAction: "hist",
+      graphPeriod: "60",
+    });
+    sources.push({
+      name: "Moneyweb ProfileData API",
+      url: "https://cache.moneyweb.co.za/mny-graphs.php",
+      accept: "application/json,text/html;q=0.9,*/*;q=0.8",
+      options: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          Origin: "https://www.moneyweb.co.za",
+          Referer: moneyweb.referer,
+        },
+        body: form.toString(),
+      },
+      parse: async (res) => parseMoneywebGraphJson(await res.json(), moneyweb.code, currentUtcDay, moneyweb.currency),
+    });
+  }
+  if (symbol) {
+    sources.push({
       name: "Yahoo Finance API",
       url: `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`,
       accept: "application/json",
       parse: async (res) => parseYahooChartJson(await res.json(), currentUtcDay),
-    },
-    {
+    });
+  }
+  if (stooqSymbol) {
+    sources.push({
       name: "Stooq CSV API",
       url: `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSymbol)}&i=d`,
       accept: "text/csv,text/plain;q=0.9,*/*;q=0.8",
       parse: async (res) => parseStooqCsv(await res.text(), currentUtcDay),
-    },
-    {
+    });
+  }
+  if (symbol) {
+    sources.push({
       name: "Yahoo Finance HTML",
       url: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`,
       accept: "text/html,application/xhtml+xml",
       parse: async (res) => parseYahooHistoryHtml(await res.text(), currentUtcDay),
-    },
-  ];
+    });
+  }
 
   let sawUpstreamOk = false;
   for (const source of sources) {
     let upstream;
     try {
-      upstream = await fetchWithTimeout(source.url, source.accept);
+      upstream = await fetchWithTimeout(source.url, source.accept, source.options);
     } catch (error) {
       console.error(`${source.name} request failed:`, error);
       continue;
@@ -207,10 +268,14 @@ async function proxyHistory(asset, cors) {
     try {
       const parsed = await source.parse(upstream);
       if (parsed && parsed.points.length) {
-        return jsonResponse({ symbol, currency: parsed.currency, source: source.name, points: parsed.points }, 200, {
-          ...cors,
-          "Cache-Control": "public, max-age=900",
-        });
+        return jsonResponse(
+          { symbol: symbol || moneyweb.code, currency: parsed.currency, source: source.name, points: parsed.points },
+          200,
+          {
+            ...cors,
+            "Cache-Control": "public, max-age=900",
+          },
+        );
       }
     } catch (error) {
       console.error(`${source.name} parse failed:`, error);

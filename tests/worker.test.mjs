@@ -158,6 +158,25 @@ test("falls back to Stooq CSV and Yahoo Finance HTML scraping when primary API f
     assert.equal(body.source, "Yahoo Finance HTML");
     assert.deepEqual(body.points, [[Date.UTC(2026, 10, 19), 20600, 20650.5, 20400.25]]);
   });
+
+  await withFetch(async (url, options) => {
+    if (url === "https://cache.moneyweb.co.za/mny-graphs.php") {
+      assert.equal(options.method, "POST");
+      assert.equal(options.headers.Origin, "https://www.moneyweb.co.za");
+      return new Response(JSON.stringify({
+        CNTF: [{ id: "CNTF", dt: "2026-11-19T00:00:00", c: "24711.00" }],
+      }), { headers: { "Content-Type": "application/json" } });
+    }
+    throw new Error(`unexpected url: ${url}`);
+  }, async () => {
+    const response = await worker.fetch(request("/history?asset=coronation"), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.symbol, "CNTF");
+    assert.equal(body.currency, "ZAR");
+    assert.equal(body.source, "Moneyweb ProfileData API");
+    assert.deepEqual(body.points, [[Date.UTC(2026, 10, 19), 247.11, 247.11, 247.11]]);
+  });
 });
 
 test("requires a working rate-limit binding and keys its limit by client IP", async () => {
