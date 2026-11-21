@@ -55,6 +55,17 @@ test("allows configured browser origins and rejects unknown origins", async () =
   });
 });
 
+test("allows the null origin for local file previews", async () => {
+  await withFetch(async () => new Response('{"data":[]}'), async () => {
+    const response = await worker.fetch(
+      request("/listings", { headers: { Origin: "null" } }),
+      env,
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "null");
+  });
+});
+
 test("allows preflight and rejects other methods without upstream calls", async () => {
   await withFetch(async () => {
     throw new Error("unexpected upstream request");
@@ -73,6 +84,40 @@ test("allows preflight and rejects other methods without upstream calls", async 
 
     const missing = await worker.fetch(request("/other"), env);
     assert.equal(missing.status, 404);
+  });
+});
+
+test("serves total market cap from the global metrics endpoint", async () => {
+  await withFetch(async (url, options) => {
+    assert.equal(url, `${API}/v1/global-metrics/quotes/latest?convert=USD`);
+    assert.equal(options.headers["X-CMC_PRO_API_KEY"], "test-key");
+    return new Response('{"data":{"quote":{"USD":{"total_market_cap":100}}}}');
+  }, async () => {
+    const response = await worker.fetch(request("/global"), { ...env, CMC_KEY: "test-key" });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).data.quote.USD.total_market_cap, 100);
+  });
+});
+
+test("serves supported index history and rejects unknown symbols", async () => {
+  const yesterday = Math.floor(Date.now() / 86400000) * 86400 - 86400;
+  await withFetch(async (url, options) => {
+    assert.equal(url, "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=5y&interval=1d");
+    assert.equal(options.redirect, "manual");
+    return new Response(JSON.stringify({
+      chart: {
+        result: [{
+          meta: { currency: "USD" },
+          timestamp: [yesterday],
+          indicators: { quote: [{ close: [6000], high: [6010], low: [5990] }] },
+        }],
+      },
+    }), { headers: { "Content-Type": "application/json" } });
+  }, async () => {
+    const response = await worker.fetch(request("/history?asset=sp500"), env);
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).points, [[yesterday * 1000, 6000, 6010, 5990]]);
+    assert.equal((await worker.fetch(request("/history?asset=unknown"), env)).status, 400);
   });
 });
 
